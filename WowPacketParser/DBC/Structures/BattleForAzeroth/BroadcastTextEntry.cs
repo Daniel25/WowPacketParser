@@ -1,6 +1,4 @@
-﻿using System.Runtime.InteropServices;
-
-namespace WowPacketParser.DBC.Structures.BattleForAzeroth
+﻿namespace WowPacketParser.DBC.Structures.BattleForAzeroth
 {
     [DBFile("BroadcastText")]
 
@@ -13,12 +11,9 @@ namespace WowPacketParser.DBC.Structures.BattleForAzeroth
         public uint ConditionID;
         public ushort EmotesID;
         public byte Flags;
-        public uint Unk;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 2)]
-        public uint[] SoundEntriesID;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-        public ushort[] EmoteID;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-        public ushort[] EmoteDelay;
+        public uint ChatBubbleDurationMs;
+        public uint[] SoundEntriesID = new uint[2];
+        public ushort[] EmoteID = new ushort[3];
+        public ushort[] EmoteDelay = new ushort[3];
     }
 }

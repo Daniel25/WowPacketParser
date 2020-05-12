@@ -58,9 +58,9 @@ namespace WowPacketParser.SQL.Builders
                 {
                     Entry = unit.Key.GetEntry(),
                     PathID = 0,
-                    MountID = npc.Mount.GetValueOrDefault(),
-                    Bytes1 = npc.Bytes1.GetValueOrDefault(),
-                    Bytes2 = npc.Bytes2.GetValueOrDefault(),
+                    MountID = (uint)npc.UnitData.MountDisplayID,
+                    Bytes1 = npc.Bytes1,
+                    Bytes2 = npc.Bytes2,
                     Emote = 0,
                     AIAnimKit = npc.AIAnimKit.GetValueOrDefault(0),
                     MovementAnimKit = npc.MovementAnimKit.GetValueOrDefault(0),
@@ -97,9 +97,9 @@ namespace WowPacketParser.SQL.Builders
             foreach (var pair in entries.SelectMany(entry => entry))
             {
                 if (list.ContainsKey(pair.Key.GetEntry()))
-                    list[pair.Key.GetEntry()].Add(pair.Value.ScalingDelta.GetValueOrDefault(0));
+                    list[pair.Key.GetEntry()].Add(pair.Value.UnitData.ScalingLevelDelta);
                 else
-                    list.Add(pair.Key.GetEntry(), new List<int> { pair.Value.ScalingDelta.GetValueOrDefault(0) });
+                    list.Add(pair.Key.GetEntry(), new List<int> { pair.Value.UnitData.ScalingLevelDelta });
             }
 
             var result = list.ToDictionary(pair => pair.Key, pair => Tuple.Create(pair.Value.Min(), pair.Value.Max()));
@@ -125,26 +125,22 @@ namespace WowPacketParser.SQL.Builders
 
                 var npc = unit.Value;
 
-                if (npc.ScalingMinLevel != null && npc.ScalingMaxLevel != null)
+                var minLevel = (uint)npc.UnitData.ScalingLevelMin;
+                var maxLevel = (uint)npc.UnitData.ScalingLevelMax;
+                var contentTuningID = npc.UnitData.ContentTuningID;
+
+                if (minLevel != 0 || maxLevel != 0 || contentTuningID != 0)
                 {
-                    uint minLevel, maxLevel;
-                    int minDelta, maxDelta;
-
-                    minLevel = (uint)npc.ScalingMinLevel;
-                    maxLevel = (uint)npc.ScalingMaxLevel;
-                    minDelta = (int)scalingdeltalevels[unit.Key.GetEntry()].Item1;
-                    maxDelta = (int)scalingdeltalevels[unit.Key.GetEntry()].Item2;
-
-                    var template = new CreatureTemplateScaling
+                    Storage.CreatureTemplateScalings.Add(new CreatureTemplateScaling
                     {
                         Entry = unit.Key.GetEntry(),
+                        DifficultyID = npc.DifficultyID,
                         LevelScalingMin = minLevel,
                         LevelScalingMax = maxLevel,
-                        LevelScalingDeltaMin = minDelta,
-                        LevelScalingDeltaMax = maxDelta
-                    };
-
-                    Storage.CreatureTemplateScalings.Add(template);
+                        LevelScalingDeltaMin = scalingdeltalevels[unit.Key.GetEntry()].Item1,
+                        LevelScalingDeltaMax = scalingdeltalevels[unit.Key.GetEntry()].Item2,
+                        ContentTuningID = contentTuningID
+                    });
                 }
             }
 
@@ -173,10 +169,8 @@ namespace WowPacketParser.SQL.Builders
                     if (!(npc.Map.ToString(CultureInfo.InvariantCulture).MatchesFilters(Settings.MapFilters)))
                         continue;
 
-                uint modelId;
-                if (npc.Model.HasValue)
-                    modelId = npc.Model.Value;
-                else
+                uint modelId = (uint)npc.UnitData.DisplayID;
+                if (modelId == 0)
                     continue;
 
                 var model = new ModelData
@@ -188,10 +182,10 @@ namespace WowPacketParser.SQL.Builders
                 if (models.Any(modelInfo => modelInfo.Item1.DisplayID == modelId))
                     continue;
 
-                var scale = npc.Size.GetValueOrDefault(1.0f);
-                model.BoundingRadius = npc.BoundingRadius.GetValueOrDefault(0.306f) / scale;
-                model.CombatReach = npc.CombatReach.GetValueOrDefault(1.5f) / scale;
-                model.Gender = npc.Gender.GetValueOrDefault(Gender.Male);
+                var scale = npc.ObjectData.Scale;
+                model.BoundingRadius = npc.UnitData.BoundingRadius / scale;
+                model.CombatReach = npc.UnitData.CombatReach / scale;
+                model.Gender = (Gender)npc.UnitData.Sex;
 
                 models.Add(model);
             }
@@ -292,33 +286,29 @@ namespace WowPacketParser.SQL.Builders
                     if (!(npc.Value.Map.ToString(CultureInfo.InvariantCulture).MatchesFilters(Settings.MapFilters)))
                         continue;
 
-                if (npc.Value.EquipmentItemId == null || npc.Value.EquipmentItemId.Length != 3)
+                var equipment = npc.Value.UnitData.VirtualItems;
+                if (equipment.Length != 3)
                     continue;
 
-                if (npc.Value.EquipmentItemId[0] == 0 && npc.Value.EquipmentItemId[1] == 0 && npc.Value.EquipmentItemId[2] == 0)
+                if (equipment[0].ItemID == 0 && equipment[1].ItemID == 0 && equipment[2].ItemID == 0)
                     continue;
 
                 var equip = new CreatureEquipment
                 {
                     CreatureID = npc.Key.GetEntry(),
-                    ItemID1 = npc.Value.EquipmentItemId[0],
-                    ItemID2 = npc.Value.EquipmentItemId[1],
-                    ItemID3 = npc.Value.EquipmentItemId[2]
+                    ItemID1 = (uint)equipment[0].ItemID,
+                    ItemID2 = (uint)equipment[1].ItemID,
+                    ItemID3 = (uint)equipment[2].ItemID,
+
+                    AppearanceModID1 = equipment[0].ItemAppearanceModID,
+                    AppearanceModID2 = equipment[1].ItemAppearanceModID,
+                    AppearanceModID3 = equipment[2].ItemAppearanceModID,
+
+                    ItemVisual1 = equipment[0].ItemVisual,
+                    ItemVisual2 = equipment[1].ItemVisual,
+                    ItemVisual3 = equipment[2].ItemVisual
                 };
 
-                if (npc.Value.EquipmentAppearanceModId != null && npc.Value.EquipmentAppearanceModId.Length == 3)
-                {
-                    equip.AppearanceModID1 = npc.Value.EquipmentAppearanceModId[0];
-                    equip.AppearanceModID2 = npc.Value.EquipmentAppearanceModId[1];
-                    equip.AppearanceModID3 = npc.Value.EquipmentAppearanceModId[2];
-                }
-
-                if (npc.Value.EquipmentItemVisual != null && npc.Value.EquipmentItemVisual.Length == 3)
-                {
-                    equip.ItemVisual1 = npc.Value.EquipmentItemVisual[0];
-                    equip.ItemVisual2 = npc.Value.EquipmentItemVisual[1];
-                    equip.ItemVisual3 = npc.Value.EquipmentItemVisual[2];
-                }
 
                 if (equips.Contains(equip))
                     continue;
@@ -414,23 +404,23 @@ namespace WowPacketParser.SQL.Builders
         }
 
         //                      entry, <minlevel, maxlevel>
-        public static Dictionary<uint, Tuple<uint, uint>> GetLevels(Dictionary<WowGuid, Unit> units)
+        public static Dictionary<uint, ValueTuple<int, int>> GetLevels(Dictionary<WowGuid, Unit> units)
         {
             if (units.Count == 0)
                 return null;
 
             var entries = units.GroupBy(unit => unit.Key.GetEntry());
-            var list = new Dictionary<uint, List<uint>>();
+            var list = new Dictionary<uint, List<int>>();
 
             foreach (var pair in entries.SelectMany(entry => entry))
             {
                 if (list.ContainsKey(pair.Key.GetEntry()))
-                    list[pair.Key.GetEntry()].Add(pair.Value.Level.GetValueOrDefault(1));
+                    list[pair.Key.GetEntry()].Add(pair.Value.UnitData.Level);
                 else
-                    list.Add(pair.Key.GetEntry(), new List<uint> { pair.Value.Level.GetValueOrDefault(1) });
+                    list.Add(pair.Key.GetEntry(), new List<int> { pair.Value.UnitData.Level });
             }
 
-            var result = list.ToDictionary(pair => pair.Key, pair => Tuple.Create(pair.Value.Min(), pair.Value.Max()));
+            var result = list.ToDictionary(pair => pair.Key, pair => ValueTuple.Create(pair.Value.Min(), pair.Value.Max()));
 
             return result.Count == 0 ? null : result;
         }
@@ -508,6 +498,34 @@ namespace WowPacketParser.SQL.Builders
                 return string.Empty;
 
             var levels = GetLevels(units);
+            var usesCurrentExpansionLevels = new Dictionary<uint, long>();
+            var expansionBaseLevel = 0;
+            if (Settings.TargetedDatabase >= TargetedDatabase.WarlordsOfDraenor && Settings.DBEnabled)
+            {
+                usesCurrentExpansionLevels = SQLDatabase.GetDict<uint, long>($"SELECT entry, 1 FROM {Settings.TDBDatabase}.creature_template WHERE HealthScalingExpansion = -1");
+                switch (Settings.TargetedDatabase)
+                {
+                    case TargetedDatabase.WarlordsOfDraenor:
+                        expansionBaseLevel = 100;
+                        break;
+                    case TargetedDatabase.Legion:
+                        expansionBaseLevel = 110;
+                        break;
+                    case TargetedDatabase.BattleForAzeroth:
+                        expansionBaseLevel = 120;
+                        break;
+                }
+            }
+
+            Func<uint, (int MinLevel, int MaxLevel)> getLevel = (uint id) =>
+            {
+                CreatureTemplate template;
+                if ((Storage.CreatureTemplates.TryGetValue(id, out template) && template.HealthScalingExpansion == ClientType.Current)
+                    || usesCurrentExpansionLevels.ContainsKey(id))
+                    return (levels[id].Item1 - expansionBaseLevel, levels[id].Item2 - expansionBaseLevel);
+
+                return levels[id];
+            };
 
             foreach (var unit in units)
             {
@@ -515,27 +533,28 @@ namespace WowPacketParser.SQL.Builders
                     continue;
 
                 var npc = unit.Value;
+                var minMaxLevel = getLevel(unit.Key.GetEntry());
 
                 var template = new CreatureTemplateNonWDB
                 {
                     Entry = unit.Key.GetEntry(),
                     GossipMenuId = npc.GossipId,
-                    MinLevel = (int)levels[unit.Key.GetEntry()].Item1,
-                    MaxLevel = (int)levels[unit.Key.GetEntry()].Item2,
-                    Faction = npc.Faction.GetValueOrDefault(35),
-                    NpcFlag = npc.NpcFlags.GetValueOrDefault(NPCFlags.None),
+                    MinLevel = minMaxLevel.MinLevel,
+                    MaxLevel = minMaxLevel.MaxLevel,
+                    Faction = (uint)npc.UnitData.FactionTemplate,
+                    NpcFlag = (NPCFlags)Utilities.MAKE_PAIR64(npc.UnitData.NpcFlags[0], npc.UnitData.NpcFlags[1]),
                     SpeedRun = npc.Movement.RunSpeed,
                     SpeedWalk = npc.Movement.WalkSpeed,
-                    BaseAttackTime = npc.MeleeTime.GetValueOrDefault(2000),
-                    RangedAttackTime = npc.RangedTime.GetValueOrDefault(2000),
-                    UnitClass = (uint)npc.Class.GetValueOrDefault(Class.Warrior),
-                    UnitFlags = npc.UnitFlags.GetValueOrDefault(UnitFlags.None),
-                    UnitFlags2 = npc.UnitFlags2.GetValueOrDefault(UnitFlags2.None),
-                    UnitFlags3 = npc.UnitFlags3.GetValueOrDefault(UnitFlags3.None),
+                    BaseAttackTime = npc.UnitData.AttackRoundBaseTime[0],
+                    RangedAttackTime = npc.UnitData.RangedAttackRoundBaseTime,
+                    UnitClass = npc.UnitData.ClassId,
+                    UnitFlags = (UnitFlags)npc.UnitData.Flags,
+                    UnitFlags2 = (UnitFlags2)npc.UnitData.Flags2,
+                    UnitFlags3 = (UnitFlags3)npc.UnitData.Flags3,
                     DynamicFlags = npc.DynamicFlags.GetValueOrDefault(UnitDynamicFlags.None),
                     DynamicFlagsWod = npc.DynamicFlagsWod.GetValueOrDefault(UnitDynamicFlagsWOD.None),
                     VehicleID = npc.Movement.VehicleId,
-                    HoverHeight = npc.HoverHeight.GetValueOrDefault(1.0f)
+                    HoverHeight = npc.UnitData.HoverHeight
                 };
 
                 if (Settings.UseDBC)
@@ -582,10 +601,10 @@ namespace WowPacketParser.SQL.Builders
                      (template.NpcFlag & NPCFlags.ClassTrainer) == 0))
                 {
                     var subname = GetSubName((int)unit.Key.GetEntry(), false); // Fall back
-                    var entry = Storage.CreatureTemplates.Where(creature => creature.Item1.Entry == unit.Key.GetEntry());
-                    if (entry.Any())
+                    CreatureTemplate entry;
+                    if (Storage.CreatureTemplates.TryGetValue(unit.Key.GetEntry(), out entry))
                     {
-                        var sub = entry.Select(creature => creature.Item1.SubName).First();
+                        var sub = entry.SubName;
                         if (sub.Length > 0)
                         {
                             template.NpcFlag |= ProcessNpcFlags(sub);
@@ -710,7 +729,7 @@ namespace WowPacketParser.SQL.Builders
                 {
                     var count = entryCount.ContainsKey(text.Key) ? entryCount[text.Key] : 0;
 
-                    if (rows.Where(text2 => text2.Data.Text == textValue.Item1.Text).Count() != 0)
+                    if (rows.Where(text2 => text2.Data.Entry == text.Key && text2.Data.Text == textValue.Item1.Text).Count() != 0)
                         continue;
 
                     var row = new Row<CreatureText>
@@ -819,7 +838,7 @@ namespace WowPacketParser.SQL.Builders
                 var row = new Row<NpcSpellClick>();
 
                 var npc = unit.Value;
-                if (npc.InteractSpellID == null)
+                if (npc.UnitData.InteractSpellID == 0)
                     continue;
 
                 if (Settings.AreaFilters.Length > 0)
@@ -831,7 +850,7 @@ namespace WowPacketParser.SQL.Builders
                         continue;
 
                 row.Data.Entry = unit.Key.GetEntry();
-                row.Data.SpellID = npc.InteractSpellID.GetValueOrDefault();
+                row.Data.SpellID = (uint)npc.UnitData.InteractSpellID;
 
                 rows.Add(row);
             }

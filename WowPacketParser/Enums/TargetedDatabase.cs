@@ -4,11 +4,13 @@ namespace WowPacketParser.Enums
     public enum TargetedDatabase
     {
         Zero                = 0,
+        TheBurningCrusade   = 1,
+        WrathOfTheLichKing  = 2,
+        Cataclysm           = 3,
+        WarlordsOfDraenor   = 4,
+        Legion              = 5,
+        BattleForAzeroth    = 6,
 
-        WrathOfTheLichKing  = 1,
-        Cataclysm           = 2,
-        WarlordsOfDraenor   = 3,
-        Legion              = 4,
-        BattleForAzeroth    = 5
+        Classic             = -1
     }
 }

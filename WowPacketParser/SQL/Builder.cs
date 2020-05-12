@@ -50,7 +50,7 @@ namespace WowPacketParser.SQL
             {
                 if (objectName.Item1.ObjectType != null && objectName.Item1.ID != null)
                 {
-                    var type = FromObjectType(objectName.Item1.ObjectType.Value);
+                    var type = objectName.Item1.ObjectType.Value;
                     Dictionary<int, string> names;
                     if (!SQLDatabase.NameStores.TryGetValue(type, out names))
                     {
@@ -59,7 +59,7 @@ namespace WowPacketParser.SQL
                     }
 
                     if (!names.ContainsKey(objectName.Item1.ID.Value))
-                        names.Add(objectName.Item1.ID.Value, objectName.Item1.Name);                        
+                        names.Add(objectName.Item1.ID.Value, objectName.Item1.Name);
                 }
             }
         }
@@ -104,7 +104,10 @@ namespace WowPacketParser.SQL
 
                     if (attr.CheckVersionMismatch)
                     {
-                        if (!((ClientVersion.Expansion == ClientType.WrathOfTheLichKing &&
+                        if (!((ClientVersion.Expansion == ClientType.TheBurningCrusade &&
+                               Settings.TargetedDatabase == TargetedDatabase.TheBurningCrusade)
+                              ||
+                              (ClientVersion.Expansion == ClientType.WrathOfTheLichKing &&
                                Settings.TargetedDatabase == TargetedDatabase.WrathOfTheLichKing)
                               ||
                               (ClientVersion.Expansion == ClientType.Cataclysm &&
@@ -117,7 +120,10 @@ namespace WowPacketParser.SQL
                                Settings.TargetedDatabase == TargetedDatabase.Legion)
                               ||
                               (ClientVersion.Expansion == ClientType.BattleForAzeroth &&
-                               Settings.TargetedDatabase == TargetedDatabase.BattleForAzeroth)))
+                               Settings.TargetedDatabase == TargetedDatabase.BattleForAzeroth)
+                              ||
+                              (ClientVersion.Expansion == ClientType.Classic &&
+                               Settings.TargetedDatabase == TargetedDatabase.Classic)))
                         {
                             Trace.WriteLine(
                                 $"{i}/{builderMethods.Count} - Error: Couldn't generate SQL output of {method.Name} since the targeted database and the sniff version don't match.");

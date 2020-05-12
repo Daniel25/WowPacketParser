@@ -8,9 +8,9 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
     {
         public static void ReadVoiceChatManagerSettings(Packet packet, params object[] idx)
         {
-            packet.ReadBit("Enabled", idx);
+            packet.ReadBit("IsSquelched", idx);
             packet.ReadPackedGuid128("BnetAccountID", idx);
-            packet.ReadPackedGuid128("Unk801_GUID2", idx);
+            packet.ReadPackedGuid128("GuildGUID", idx);
         }
 
         [Parser(Opcode.SMSG_FEATURE_SYSTEM_STATUS)]
@@ -29,6 +29,8 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
             packet.ReadInt64("TokenBalanceAmount");
             packet.ReadUInt32("BpayStoreProductDeliveryDelay");
             packet.ReadUInt32("ClubsPresenceUpdateTimer");
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_0_28724))
+                packet.ReadUInt32("HiddenUIClubsPresenceUpdateTimer");
 
             packet.ResetBitReader();
             packet.ReadBit("VoiceEnabled");
@@ -57,6 +59,8 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
             packet.ReadBit("ClubsEnabled");
             packet.ReadBit("ClubsBattleNetClubTypeAllowed");
             packet.ReadBit("ClubsCharacterClubTypeAllowed");
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_5_29683))
+                packet.ReadBit("ClubsPresenceUpdateEnabled");
             packet.ReadBit("VoiceChatDisabledByParentalControl");
             packet.ReadBit("VoiceChatMutedByParentalControl");
 
@@ -222,6 +226,79 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
                 packet.ReadBit("IsGM", i);
 
                 packet.ReadWoWString("GuildName", bits460, i);
+            }
+        }
+
+        [Parser(Opcode.SMSG_MULTIPLE_PACKETS)]
+        public static void HandleMultiplePackets(Packet packet)
+        {
+            packet.WriteLine("{");
+            int i = 0;
+            while (packet.CanRead())
+            {
+                int opcode = 0;
+                int len = 0;
+                byte[] bytes = null;
+
+                len = packet.ReadUInt16();
+                opcode = packet.ReadUInt16();
+                bytes = packet.ReadBytes(len);
+
+                if (bytes == null || len == 0)
+                    continue;
+
+                if (i > 0)
+                    packet.WriteLine();
+
+                packet.Write("[{0}] ", i++);
+
+                using (Packet newpacket = new Packet(bytes, opcode, packet.Time, packet.Direction, packet.Number, packet.Writer, packet.FileName))
+                    Handler.Parse(newpacket, true);
+
+            }
+            packet.WriteLine("}");
+        }
+
+        [Parser(Opcode.SMSG_SET_CURRENCY)]
+        public static void HandleSetCurrency(Packet packet)
+        {
+            packet.ReadInt32("Type");
+            packet.ReadInt32("Quantity");
+            packet.ReadUInt32("Flags");
+
+            var hasWeeklyQuantity = packet.ReadBit("HasWeeklyQuantity");
+            var hasTrackedQuantity = packet.ReadBit("HasTrackedQuantity");
+            var hasMaxQuantity = packet.ReadBit("HasMaxQuantity");
+            packet.ReadBit("SuppressChatLog");
+            var hasQuantityChange = false;
+            var hasQuantityGainSource = false;
+            var hasQuantityLostSource = false;
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_5_29683))
+            {
+                hasQuantityChange = packet.ReadBit("HasQuantityChange");
+                hasQuantityGainSource = packet.ReadBit("HasQuantityGainSource");
+                hasQuantityLostSource = packet.ReadBit("HasQuantityLostSource");
+            }
+
+            if (hasWeeklyQuantity)
+                packet.ReadInt32("WeeklyQuantity");
+
+            if (hasTrackedQuantity)
+                packet.ReadInt32("TrackedQuantity");
+
+            if (hasMaxQuantity)
+                packet.ReadInt32("MaxQuantity");
+
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_5_29683))
+            {
+                if (hasQuantityChange)
+                    packet.ReadInt32("QuantityChange");
+
+                if (hasQuantityGainSource)
+                    packet.ReadInt32("QuantityGainSource");
+
+                if (hasQuantityLostSource)
+                    packet.ReadInt32("QuantityLostSource");
             }
         }
     }

@@ -3,6 +3,7 @@
     [DBFile("Difficulty")]
     public sealed class DifficultyEntry
     {
+        public uint ID;
         public string Name;
         public byte InstanceType;
         public byte OrderIndex;
@@ -10,7 +11,7 @@
         public byte FallbackDifficultyID;
         public byte MinPlayers;
         public byte MaxPlayers;
-        public byte Flags;
+        public ushort Flags;
         public byte ItemContext;
         public byte ToggleDifficultyID;
         public ushort GroupSizeHealthCurveID;         // unproven

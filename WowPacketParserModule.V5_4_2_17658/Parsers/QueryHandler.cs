@@ -100,7 +100,7 @@ namespace WowPacketParserModule.V5_4_2_17658.Parsers
 
             packet.AddSniffData(StoreNameType.Unit, entry.Key, "QUERY_RESPONSE");
 
-            Storage.CreatureTemplates.Add(creature, packet.TimeSpan);
+            Storage.CreatureTemplates.Add(creature.Entry.Value, creature, packet.TimeSpan);
 
             if (ClientLocale.PacketLocale != LocaleConstant.enUS)
             {
@@ -118,7 +118,7 @@ namespace WowPacketParserModule.V5_4_2_17658.Parsers
 
             ObjectName objectName = new ObjectName
             {
-                ObjectType = ObjectType.Unit,
+                ObjectType = StoreNameType.Unit,
                 ID = entry.Key,
                 Name = creature.Name
             };

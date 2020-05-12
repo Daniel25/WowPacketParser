@@ -80,12 +80,12 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
         {
             packet.ReadInt32("ShipmentRecID", indexes);
             packet.ReadInt64("ShipmentID", indexes);
-            packet.ReadInt64("Unk2", indexes);
+            packet.ReadInt64("AssignedFollowerDbID", indexes);
             packet.ReadTime("CreationTime", indexes);
             packet.ReadInt32("ShipmentDuration", indexes);
-            packet.ReadInt32("Unk8", indexes);
+            packet.ReadInt32("BuildingType", indexes);
         }
-        public static void ReadGarrisonMissionAreaBonus(Packet packet, params object[] indexes)
+        public static void ReadGarrisonMissionBonusAbility(Packet packet, params object[] indexes)
         {
             packet.ReadInt32("GarrMssnBonusAbilityID", indexes);
             packet.ReadInt32("StartTime", indexes);
@@ -257,7 +257,7 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
             if (type == 3)
             {
                 packet.ReadBit("BonusRoll");
-                ItemHandler.ReadItemInstance(packet);
+                Substructures.ItemHandler.ReadItemInstance(packet);
                 packet.ReadInt32("SpecializationID");
                 packet.ReadInt32("ItemQuantity?");
             }
@@ -277,7 +277,7 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
             if (type == 0)
             {
                 packet.ReadBit("BonusRoll");
-                ItemHandler.ReadItemInstance(packet);
+                Substructures.ItemHandler.ReadItemInstance(packet);
                 packet.ReadInt32("SpecializationID");
                 packet.ReadInt32("ItemQuantity?");
             }
@@ -297,7 +297,7 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
             if (type == 3)
             {
                 packet.ReadBit("BonusRoll");
-                ItemHandler.ReadItemInstance(packet);
+                Substructures.ItemHandler.ReadItemInstance(packet);
                 packet.ReadInt32("SpecializationID");
                 packet.ReadInt32("ItemQuantity?");
             }
@@ -317,7 +317,7 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
             if (type == 2)
             {
                 packet.ReadBit("BonusRoll");
-                ItemHandler.ReadItemInstance(packet);
+                Substructures.ItemHandler.ReadItemInstance(packet);
                 packet.ReadInt32("SpecializationID");
                 packet.ReadInt32("ItemQuantity?");
             }
@@ -337,7 +337,7 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
             if (type == 2)
             {
                 packet.ReadBit("BonusRoll");
-                ItemHandler.ReadItemInstance(packet);
+                Substructures.ItemHandler.ReadItemInstance(packet);
                 packet.ReadInt32("SpecializationID");
                 packet.ReadInt32("ItemQuantity?");
             }
@@ -357,7 +357,7 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
             if (type == 0)
             {
                 packet.ReadBit("BonusRoll");
-                ItemHandler.ReadItemInstance(packet);
+                Substructures.ItemHandler.ReadItemInstance(packet);
                 packet.ReadInt32("SpecializationID");
                 packet.ReadInt32("ItemQuantity?");
             }
@@ -396,7 +396,7 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
                 ReadGarrisonMission(packet, "GarrisonMission", i);
 
             for (int i = 0; i < areaBonusCount; i++)
-                ReadGarrisonMissionAreaBonus(packet, "GarrisonMissionAreaBonus", i);
+                ReadGarrisonMissionBonusAbility(packet, "GarrisonMissionAreaBonus", i);
 
             for (int i = 0; i < int16; i++)
                 packet.ReadInt32("ArchivedMissions", i);
@@ -536,12 +536,26 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
         public static void HandleGarrisonSetupTrophy(Packet packet)
         {
             var count = packet.ReadInt32("TrophyCount");
-            for (int i = 0; i < count; i++) // @To-Do: need verification
+            for (int i = 0; i < count; i++) 
             {
-                packet.ReadInt32("Unk1", i);
-                packet.ReadInt32("Unk2", i);
+                packet.ReadInt32("TrophyInstanceID", i);
+                packet.ReadInt32("TrophyID", i);
             }
         }
+
+        [Parser(Opcode.SMSG_LOAD_SELECTED_TROPHY_RESULT)]
+        public static void HandleSelectedTrophyResult(Packet packet)
+        {
+            packet.ResetBitReader();
+            packet.ReadBit("Success");
+            packet.ReadInt32("TrophyID");
+        }
+
+        [Parser(Opcode.CMSG_LOAD_SELECTED_TROPHY)]
+        public static void HandleLoadSelectedTrophy(Packet packet)
+        {
+            packet.ReadInt32("TrophyInstanceID");
+        }        
 
         [Parser(Opcode.SMSG_GARRISON_ADD_FOLLOWER_RESULT)]
         public static void HandleGarrisonAddFollowerResult(Packet packet)
@@ -591,7 +605,7 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
         [Parser(Opcode.CMSG_GET_TROPHY_LIST)]
         public static void HandleGetTrophyList(Packet packet)
         {
-            packet.ReadInt32("TrophyTypeID");
+            packet.ReadUInt32E<TrophyType>("TrophyTypeID");
         }
 
         [Parser(Opcode.CMSG_GARRISON_SET_FOLLOWER_INACTIVE)]
@@ -632,8 +646,8 @@ namespace WowPacketParserModule.V6_0_2_19033.Parsers
             for (int i = 0; i < trophyCount; i++)
             {
                 packet.ReadInt32("TrophyID", i);
-                packet.ReadInt32("Unk1", i);
-                packet.ReadInt32("Unk2", i);
+                packet.ReadUInt32E<TrophyLockCode>("LockCode", i);
+                packet.ReadInt32("AchievementRequired", i);
             }
         }
 

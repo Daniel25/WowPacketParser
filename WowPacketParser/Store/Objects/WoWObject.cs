@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using WowPacketParser.Enums;
 using WowPacketParser.Misc;
+using WowPacketParser.Store.Objects.UpdateFields;
+using WowPacketParser.Store.Objects.UpdateFields.LegacyImplementation;
 
 namespace WowPacketParser.Store.Objects
 {
@@ -15,8 +17,9 @@ namespace WowPacketParser.Store.Objects
         public int Area;
         public int Zone;
 
-        public Dictionary<int, UpdateField> UpdateFields; // SMSG_UPDATE_OBJECT - CreateObject
-        public Dictionary<int, List<UpdateField>> DynamicUpdateFields; // SMSG_UPDATE_OBJECT - CreateObject
+        public IObjectData ObjectData;
+        public Dictionary<int, UpdateField> UpdateFields;
+        public Dictionary<int, List<UpdateField>> DynamicUpdateFields;
 
         public uint PhaseMask;
 
@@ -25,6 +28,11 @@ namespace WowPacketParser.Store.Objects
         public uint DifficultyID;
 
         public bool ForceTemporarySpawn;
+
+        public WoWObject()
+        {
+            ObjectData = new ObjectData(this);
+        }
 
         public virtual bool IsTemporarySpawn()
         {
@@ -76,15 +84,15 @@ namespace WowPacketParser.Store.Objects
             return MapIsContinent(Map) ? 1 : 3;
         }
 
-        public List<byte> GetDefaultSpawnDifficulties()
+        public List<int> GetDefaultSpawnDifficulties()
         {
             if (Settings.UseDBC && DBC.DBC.MapDifficultyStores != null)
             {
-                if (DBC.DBC.MapDifficultyStores.ContainsKey((ushort)Map))
-                    return DBC.DBC.MapDifficultyStores[(ushort)Map];
+                if (DBC.DBC.MapDifficultyStores.ContainsKey((int)Map))
+                    return DBC.DBC.MapDifficultyStores[(int)Map];
             }
 
-            return new List<byte>();
+            return new List<int>();
         }
 
         private static bool MapIsContinent(uint mapId)
@@ -97,9 +105,10 @@ namespace WowPacketParser.Store.Objects
                 case 530:   // Outland
                 case 571:   // Northrend
                 case 609:   // Ebon Hold
-                case 638:   // Gilneas 1
-                case 655:   // Gilneas 2
-                case 656:   // Gilneas 3
+                case 638:   // Gilneas
+                case 654:   // Gilneas2
+                case 655:   // GilneasPhase1
+                case 656:   // GilneasPhase2
                 case 646:   // Deepholm
                 case 648:   // Kezan 1
                 case 659:   // Kezan 2

@@ -41,10 +41,27 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
                 packet.ReadUInt32("AccountCurrency");
                 packet.ReadTime("Time");
 
-                for (var i = 0; i < classes; ++i)
+                if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_3_0_33062))
                 {
-                    packet.ReadByteE<Class>("Class", "AvailableClasses", i);
-                    packet.ReadByteE<ClientType>("RequiredExpansion", "AvailableClasses", i);
+                    for (var i = 0; i < classes; ++i)
+                    {
+                        packet.ReadByteE<Race>("RaceID", "AvailableClasses", i);
+                        var classesForRace = packet.ReadUInt32();
+                        for (var j = 0u; j < classesForRace; ++j)
+                        {
+                            packet.ReadByteE<Class>("ClassID", "AvailableClasses", i, "Classes", j);
+                            packet.ReadByteE<ClientType>("ActiveExpansionLevel", "AvailableClasses", i, "Classes", j);
+                            packet.ReadByteE<ClientType>("AccountExpansionLevel", "AvailableClasses", i, "Classes", j);
+                        }
+                    }
+                }
+                else
+                {
+                    for (var i = 0; i < classes; ++i)
+                    {
+                        packet.ReadByteE<Class>("Class", "AvailableClasses", i);
+                        packet.ReadByteE<ClientType>("RequiredExpansion", "AvailableClasses", i);
+                    }
                 }
 
                 packet.ResetBitReader();
@@ -78,8 +95,14 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
                     packet.ResetBitReader();
                     packet.ReadBit("IsLocal", "VirtualRealms", i);
                     packet.ReadBit("IsInternalRealm", "VirtualRealms", i);
-                    var nameLen1 = packet.ReadBits(8);
-                    var nameLen2 = packet.ReadBits(8);
+
+                    var bitsCount = 8;
+
+                    if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_0_28724) && ClientVersion.RemovedInVersion(ClientVersionBuild.V8_1_5_29683))
+                        bitsCount = 9;
+
+                    var nameLen1 = packet.ReadBits(bitsCount);
+                    var nameLen2 = packet.ReadBits(bitsCount);
                     packet.ReadWoWString("RealmNameActual", nameLen1, "VirtualRealms", i);
                     packet.ReadWoWString("RealmNameNormalized", nameLen2, "VirtualRealms", i);
                 }

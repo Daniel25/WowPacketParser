@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using WowPacketParser.DBC;
 using WowPacketParser.Enums;
 using WowPacketParser.Misc;
 using WowPacketParser.Parsing;
@@ -9,6 +11,71 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
 {
     public static class SpellHandler
     {
+        public static void ReadSpellTargetData(Packet packet, uint spellID, params object[] idx)
+        {
+            packet.ResetBitReader();
+
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_5_29683))
+                packet.ReadBitsE<TargetFlag>("Flags", 26, idx);
+            else
+                packet.ReadBitsE<TargetFlag>("Flags", 25, idx);
+
+            var hasSrcLoc = packet.ReadBit("HasSrcLocation", idx);
+            var hasDstLoc = packet.ReadBit("HasDstLocation", idx);
+            var hasOrient = packet.ReadBit("HasOrientation", idx);
+            var hasMapID = packet.ReadBit("hasMapID ", idx);
+            var nameLength = packet.ReadBits(7);
+
+            packet.ReadPackedGuid128("Unit", idx);
+            packet.ReadPackedGuid128("Item", idx);
+
+            if (hasSrcLoc)
+                V6_0_2_19033.Parsers.SpellHandler.ReadLocation(packet, "SrcLocation");
+
+            var dstLocation = new Vector3();
+            if (hasDstLoc)
+                dstLocation = V6_0_2_19033.Parsers.SpellHandler.ReadLocation(packet, "DstLocation");
+
+            if (hasOrient)
+                packet.ReadSingle("Orientation", idx);
+
+            int mapID = -1;
+            if (hasMapID)
+                mapID = (ushort)packet.ReadInt32("MapID", idx);
+
+            if (Settings.UseDBC && dstLocation != null && mapID != -1)
+            {
+                for (uint i = 0; i < 32; i++)
+                {
+                    var tuple = Tuple.Create(spellID, i);
+                    if (DBC.SpellEffectStores.ContainsKey(tuple))
+                    {
+                        var effect = DBC.SpellEffectStores[tuple];
+                        if ((Targets)effect.ImplicitTarget[0] == Targets.TARGET_DEST_DB || (Targets)effect.ImplicitTarget[1] == Targets.TARGET_DEST_DB)
+                        {
+                            string effectHelper = $"Spell: { StoreGetters.GetName(StoreNameType.Spell, (int)spellID) } Efffect: { effect.Effect } ({ (SpellEffects)effect.Effect })";
+
+                            var spellTargetPosition = new SpellTargetPosition
+                            {
+                                ID = spellID,
+                                EffectIndex = (byte)i,
+                                PositionX = dstLocation.X,
+                                PositionY = dstLocation.Y,
+                                PositionZ = dstLocation.Z,
+                                MapID = (ushort)mapID,
+                                EffectHelper = effectHelper
+                            };
+
+                            if (!Storage.SpellTargetPositions.ContainsKey(spellTargetPosition))
+                                Storage.SpellTargetPositions.Add(spellTargetPosition);
+                        }
+                    }
+                }
+            }
+
+            packet.ReadWoWString("Name", nameLength, idx);
+        }
+
         public static void ReadTalentGroupInfo(Packet packet, params object[] idx)
         {
             packet.ReadInt32("SpecId", idx);
@@ -71,6 +138,9 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
 
             var hitTargetsCount = packet.ReadBits("HitTargetsCount", 16, idx);
             var missTargetsCount = packet.ReadBits("MissTargetsCount", 16, idx);
+            uint hitStatusCount = 0;
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_0_28724))
+                hitStatusCount = packet.ReadBits("HitStatusCount", 16, idx);
             var missStatusCount = packet.ReadBits("MissStatusCount", 16, idx);
             var remainingPowerCount = packet.ReadBits("RemainingPowerCount", 9, idx);
 
@@ -80,13 +150,17 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
             for (var i = 0; i < missStatusCount; ++i)
                 V6_0_2_19033.Parsers.SpellHandler.ReadSpellMissStatus(packet, idx, "MissStatus", i);
 
-            V7_0_3_22248.Parsers.SpellHandler.ReadSpellTargetData(packet, spellID, idx, "Target");
+            ReadSpellTargetData(packet, spellID, idx, "Target");
 
             for (var i = 0; i < hitTargetsCount; ++i)
                 packet.ReadPackedGuid128("HitTarget", idx, i);
 
             for (var i = 0; i < missTargetsCount; ++i)
                 packet.ReadPackedGuid128("MissTarget", idx, i);
+
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_0_28724))
+                for (var i = 0; i < hitStatusCount; ++i)
+                    packet.ReadByte("HitStatus", idx, i);
 
             for (var i = 0; i < remainingPowerCount; ++i)
                 V6_0_2_19033.Parsers.SpellHandler.ReadSpellPowerData(packet, idx, "RemainingPower", i);
@@ -142,6 +216,8 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
 
             packet.ReadInt16("PlayerLevelDelta", idx);
             packet.ReadUInt16("PlayerItemLevel", idx);
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_0_28724) && !ClientVersion.IsClassicClientVersionBuild(ClientVersion.Build))
+                packet.ReadUInt16("TargetItemLevel", idx);
             packet.ReadUInt16("ScalingHealthItemLevelCurveID", idx);
             packet.ReadByte("TargetLevel", idx);
             packet.ReadByte("Expansion", idx);
@@ -240,18 +316,19 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
         {
             packet.ReadPackedGuid128("Source");
             packet.ReadPackedGuid128("Target");
-            packet.ReadPackedGuid128("UnkGuid");
+            packet.ReadPackedGuid128("Transport");
 
             packet.ReadVector3("TargetPosition");
 
             packet.ReadInt32("SpellVisualID");
             packet.ReadSingle("TravelSpeed");
-
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_0_28724))
+                packet.ReadUInt16("HitReason");
             packet.ReadUInt16("MissReason");
             packet.ReadUInt16("ReflectStatus");
 
-            packet.ReadSingle("Orientation");
-            packet.ReadSingle("UnkFloat");
+            packet.ReadSingle("LaunchDelay");
+            packet.ReadSingle("MinDuration");
 
             packet.ReadBit("SpeedAsTime");
         }
@@ -265,8 +342,8 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
             packet.ReadPackedGuid128("Target");
             packet.ReadInt32("SpellVisualID");
             packet.ReadSingle("TravelSpeed");
-            packet.ReadSingle("UnkFloat");
-            packet.ReadSingle("801_UnkFloat");
+            packet.ReadSingle("LaunchDelay");
+            packet.ReadSingle("MinDuration");
             packet.ReadBit("SpeedAsTime");
         }
 
@@ -290,6 +367,19 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
 
             packet.ReadByteE<SpellMechanic>("Mechanic");
             packet.ReadByte("Type");
+        }
+
+        [Parser(Opcode.SMSG_SEND_SPELL_CHARGES)] // already since 7.?.?
+        public static void HandleSendSpellCharges(Packet packet)
+        {
+            var int4 = packet.ReadInt32("SpellChargeEntryCount");
+            for (int i = 0; i < int4; i++)
+            {
+                packet.ReadUInt32("Category", i);
+                packet.ReadUInt32("NextRecoveryTime", i);
+                packet.ReadSingle("ChargeModRate", i);
+                packet.ReadByte("ConsumedCharges", i);
+            }
         }
     }
 }

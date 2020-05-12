@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using WowPacketParser.Enums;
 using WowPacketParser.Enums.Version;
@@ -17,7 +18,8 @@ namespace WowPacketParser.Parsing.Parsers
         public static uint CurrentDifficultyID = 1;
         public static int CurrentPhaseMask = 1;
 
-        public static readonly ConcurrentBag<ushort> ActivePhases = new ConcurrentBag<ushort>();
+        // this is a dictionary because ConcurrentSet does not exist
+        public static readonly IDictionary<ushort, bool> ActivePhases = new ConcurrentDictionary<ushort, bool>();
 
         public static MovementInfo ReadMovementInfo(Packet packet, WowGuid guid, object index = null)
         {
@@ -181,10 +183,9 @@ namespace WowPacketParser.Parsing.Parsers
 
             if (guid.GetHighType() == HighGuidType.Creature && Storage.Objects != null && Storage.Objects.ContainsKey(guid))
             {
-                WoWObject obj = Storage.Objects[guid].Item1;
-                UpdateField uf;
-                if (obj.UpdateFields != null && obj.UpdateFields.TryGetValue(UpdateFields.GetUpdateField(UnitField.UNIT_FIELD_FLAGS), out uf))
-                    if ((uf.UInt32Value & (uint)UnitFlags.IsInCombat) == 0) // movement could be because of aggro so ignore that
+                var obj = Storage.Objects[guid].Item1 as Unit;
+                if (obj.UpdateFields != null)
+                    if ((obj.UnitData.Flags & (uint)UnitFlags.IsInCombat) == 0) // movement could be because of aggro so ignore that
                         obj.Movement.HasWpsOrRandMov = true;
             }
 
@@ -1587,7 +1588,7 @@ namespace WowPacketParser.Parsing.Parsers
             count = packet.ReadUInt32() / 2;
             packet.AddValue("Phases count", count);
             for (var i = 0; i < count; ++i)
-                ActivePhases.Add(packet.ReadUInt16("Phase id", i)); // Phase.dbc
+                ActivePhases.Add(packet.ReadUInt16("Phase id", i), true); // Phase.dbc
 
             count = packet.ReadUInt32() / 2;
             packet.AddValue("WorldMapArea swap count", count);
@@ -1619,7 +1620,7 @@ namespace WowPacketParser.Parsing.Parsers
             count = packet.ReadUInt32() / 2;
             packet.AddValue("Phases count", count);
             for (var i = 0; i < count; ++i)
-                ActivePhases.Add(packet.ReadUInt16("Phase id", i)); // Phase.dbc
+                ActivePhases.Add(packet.ReadUInt16("Phase id", i), true); // Phase.dbc
 
             packet.ReadXORByte(guid, 1);
             packet.ReadXORByte(guid, 6);
@@ -1787,30 +1788,36 @@ namespace WowPacketParser.Parsing.Parsers
         }
 
         [Parser(Opcode.SMSG_COMPRESSED_MOVES)]
+        [Parser(Opcode.SMSG_MULTIPLE_MOVES)]
         public static void HandleCompressedMoves(Packet packet)
         {
+            var uncompressedSize = packet.ReadInt32("Data Size");
+
             packet.WriteLine("{"); // To be able to see what is inside this packet.
             packet.WriteLine();
 
-            using (var pkt = packet.Inflate(packet.ReadInt32()))
-            {
-                while (pkt.CanRead())
-                {
-                    var size = pkt.ReadByte();
-                    var opc = pkt.ReadInt16();
-                    var data = pkt.ReadBytes(size - 2);
+            Packet pkt;
+            if (packet.Opcode == Opcodes.GetOpcode(Opcode.SMSG_COMPRESSED_MOVES, Direction.ServerToClient))
+                pkt = packet.Inflate(uncompressedSize);
+            else
+                pkt = packet;
 
-                    using (var newPacket = new Packet(data, opc, pkt.Time, pkt.Direction, pkt.Number, packet.Writer, packet.FileName))
-                        Handler.Parse(newPacket, true);
-                    packet.WriteLine();
-                }
+            while (pkt.CanRead())
+            {
+                var size = pkt.ReadByte();
+                var opc = pkt.ReadInt16();
+                var data = pkt.ReadBytes(size - 2);
+
+                using (var newPacket = new Packet(data, opc, pkt.Time, pkt.Direction, pkt.Number, packet.Writer, packet.FileName))
+                    Handler.Parse(newPacket, true);
+                packet.WriteLine();
             }
 
             packet.WriteLine("}");
             packet.ReadToEnd();
         }
 
-        [Parser(Opcode.SMSG_MOVE_KNOCK_BACK, ClientVersionBuild.V4_2_2_14545)]
+        [Parser(Opcode.SMSG_MOVE_KNOCK_BACK, ClientVersionBuild.V4_2_2_14545, ClientVersionBuild.V4_3_4_15595)]
         public static void HandleMoveKnockBack422(Packet packet)
         {
             var guid = packet.StartBitStream(5, 2, 6, 3, 1, 4, 0, 7);

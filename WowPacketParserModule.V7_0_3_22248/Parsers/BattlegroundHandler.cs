@@ -6,6 +6,11 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
 {
     public static class BattlegroundHandler
     {
+        [Parser(Opcode.CMSG_REQUEST_PVP_BRAWL_INFO)]
+        public static void HandleBattlegroundZero(Packet packet)
+        {
+        }
+
         [Parser(Opcode.CMSG_BATTLEMASTER_JOIN_ARENA)]
         public static void HandleBattlemasterJoinArena(Packet packet)
         {
@@ -149,6 +154,113 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
             packet.ReadByteE<ReportPvPAFKResult>("Result");
             packet.ReadByte("NumBlackMarksOnOffender");
             packet.ReadByte("NumPlayersIHaveReported");
+        }
+
+        [Parser(Opcode.SMSG_REQUEST_PVP_REWARDS_RESPONSE)]
+        public static void HandleRequestPVPRewardsResponse(Packet packet)
+        {
+            V6_0_2_19033.Parsers.LfgHandler.ReadLfgPlayerQuestReward(packet, "RandomBGRewards");
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V7_1_0_22900))
+            {
+                packet.ResetBitReader();
+                packet.ReadBit("HasWonRatedBg10v10");
+                packet.ReadBit("HasWonArenaSkirmish");
+                packet.ReadBit("HasWonArena2v2");
+                packet.ReadBit("HasWonArena3v3");
+                if (ClientVersion.AddedInVersion(ClientVersionBuild.V7_2_0_23706))
+                {
+                    packet.ReadBit("HasWonBrawlBG");
+                    packet.ReadBit("HasWonBrawlArena");
+                }
+            }
+            V6_0_2_19033.Parsers.LfgHandler.ReadLfgPlayerQuestReward(packet, "RatedBGRewards");
+            V6_0_2_19033.Parsers.LfgHandler.ReadLfgPlayerQuestReward(packet, "ArenaSkirmishRewards");
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V7_1_0_22900))
+            {
+                V6_0_2_19033.Parsers.LfgHandler.ReadLfgPlayerQuestReward(packet, "Arena2v2Rewards");
+                V6_0_2_19033.Parsers.LfgHandler.ReadLfgPlayerQuestReward(packet, "Arena3v3Rewards");
+            }
+            else
+                V6_0_2_19033.Parsers.LfgHandler.ReadLfgPlayerQuestReward(packet, "ArenaRewards");
+
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V7_2_0_23706))
+            {
+                V6_0_2_19033.Parsers.LfgHandler.ReadLfgPlayerQuestReward(packet, "BrawlBGRewards");
+                V6_0_2_19033.Parsers.LfgHandler.ReadLfgPlayerQuestReward(packet, "BrawlArenaRewards");
+            }
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_0_1_27101))
+                V6_0_2_19033.Parsers.LfgHandler.ReadLfgPlayerQuestReward(packet, "EpicBGRewards");
+        }
+
+        [Parser(Opcode.SMSG_RATED_BATTLEFIELD_INFO)]
+        public static void HandleRatedBattlefieldInfo(Packet packet)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                packet.ReadInt32("Rating", i);
+                packet.ReadInt32("Ranking", i);
+                packet.ReadInt32("SeasonPlayed", i);
+                packet.ReadInt32("SeasonWon", i);
+                packet.ReadInt32("UnkPlayed", i); // equal to SeasonPlayed
+                packet.ReadInt32("UnkWon", i); // equal to SeasonWon
+                packet.ReadInt32("WeeklyPlayed", i);
+                packet.ReadInt32("WeeklyWon", i);
+                packet.ReadInt32("WeeklyBestRating", i);
+                if (ClientVersion.AddedInVersion(ClientVersionBuild.V7_1_0_22900))
+                    packet.ReadInt32("LastWeeksBestRating", i);
+                packet.ReadInt32("SeasonBestRating", i);
+                if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_0_1_27101))
+                {
+                    packet.ReadInt32("PvpTier", i);
+                    packet.ResetBitReader();
+                    packet.ReadBit("UnkBit_801", i); // unused?
+                }
+            }
+        }
+
+        [Parser(Opcode.CMSG_BATTLEMASTER_JOIN_BRAWL)]
+        public static void HandleBattlemasterBrawl(Packet packet)
+        {
+            packet.ReadByteE<LfgRoleFlag>("Roles");
+        }
+
+        [Parser(Opcode.SMSG_REQUEST_PVP_BRAWL_INFO_RESPONSE)]
+        public static void HandleRequestPVPBrawlInfoResponse(Packet packet)
+        {
+            packet.ReadInt32("TimeToBrawl");
+            packet.ReadInt32("BattlegroundID");
+            packet.ReadInt32("LFGDungeonID");
+            packet.ResetBitReader();
+            packet.ReadBit("Active");
+            var titleLen = packet.ReadBits(9);
+            var typeLen = packet.ReadBits(10);
+            var objectiveLen = packet.ReadBits(14);
+            packet.ReadWoWString("Title", titleLen);
+            packet.ReadWoWString("Type", typeLen);
+            packet.ReadWoWString("Objective", objectiveLen);
+        }
+
+        [Parser(Opcode.CMSG_BATTLEMASTER_JOIN_SKIRMISH)]
+        public static void HandleBattlemasterJoinSkirmish(Packet packet)
+        {
+            packet.ResetBitReader();
+            packet.ReadBit("JoinAsGroup");
+            packet.ReadBit("IsRequeue");
+            packet.ReadByteE<LfgRoleFlag>("Roles");
+            packet.ReadByte("Bracket");
+        }
+
+        [Parser(Opcode.CMSG_REQUEST_CROWD_CONTROL_SPELL)]
+        public static void HandleRequestCrowdControlSpell(Packet packet)
+        {
+            packet.ReadPackedGuid128("PlayerGuid");
+        }
+
+        [Parser(Opcode.SMSG_ARENA_CROWD_CONTROL_SPELLS)]
+        public static void HandleArenaCrowdControlSpells(Packet packet)
+        {
+            packet.ReadPackedGuid128("PlayerGuid");
+            packet.ReadInt32("CrowdControlSpellID");
         }
     }
 }

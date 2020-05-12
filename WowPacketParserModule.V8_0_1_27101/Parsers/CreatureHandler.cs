@@ -92,6 +92,15 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
             creature.VignetteID = (uint)packet.ReadInt32("VignetteID");
             creature.UnitClass = (uint)packet.ReadInt32E<Class>("UnitClass");
 
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_0_28724))
+                creature.FadeRegionRadius = packet.ReadSingle("FadeRegionRadius");
+
+            if (ClientVersion.AddedInVersion(ClientVersionBuild.V8_1_5_29683))
+            {
+                creature.WidgetSetID = packet.ReadInt32("WidgetSetID");
+                creature.WidgetSetUnitConditionID = packet.ReadInt32("WidgetSetUnitConditionID");
+            }
+
             if (titleLen > 1)
                 creature.SubName = packet.ReadCString("Title");
 
@@ -115,7 +124,7 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
 
             packet.AddSniffData(StoreNameType.Unit, entry.Key, "QUERY_RESPONSE");
 
-            Storage.CreatureTemplates.Add(creature, packet.TimeSpan);
+            Storage.CreatureTemplates.Add(creature.Entry.Value, creature, packet.TimeSpan);
 
             if (ClientLocale.PacketLocale != LocaleConstant.enUS)
             {
@@ -133,7 +142,7 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
 
             ObjectName objectName = new ObjectName
             {
-                ObjectType = ObjectType.Unit,
+                ObjectType = StoreNameType.Unit,
                 ID = entry.Key,
                 Name = creature.Name
             };

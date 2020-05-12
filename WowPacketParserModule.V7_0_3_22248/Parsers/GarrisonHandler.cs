@@ -122,7 +122,7 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
             if (type == 0)
             {
                 packet.ReadBit("BonusRoll");
-                V6_0_2_19033.Parsers.ItemHandler.ReadItemInstance(packet);
+                Substructures.ItemHandler.ReadItemInstance(packet);
                 packet.ReadInt32("SpecializationID");
                 packet.ReadInt32("ItemQuantity?");
             }
@@ -187,7 +187,7 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
                     ReadGarrisonMissionOvermaxRewards(packet, "MissionOvermaxRewards", i, j);
 
                 for (int j = 0; j < areaBonusCount; j++)
-                    V6_0_2_19033.Parsers.GarrisonHandler.ReadGarrisonMissionAreaBonus(packet, "MissionAreaBonus", i, j);
+                    V6_0_2_19033.Parsers.GarrisonHandler.ReadGarrisonMissionBonusAbility(packet, "MissionAreaBonus", i, j);
 
                 for (int j = 0; j < talentsCount; j++)
                     ReadGarrisonTalents(packet, "Talents", i, j);
@@ -321,7 +321,7 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
                 for (uint i = 0; i < count; i++)
                 {
                     packet.ReadUInt64("FollowerDBID", i);
-                    packet.ReadUInt32("UnkUint32", i); // MissionCompleteState ?
+                    packet.ReadUInt32("Flags", i); 
                 }
                 packet.ReadBit("Succeeded");
             }
@@ -354,7 +354,7 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
         {
             packet.ReadInt32E<GarrisonType>("GarrTypeId");
             packet.ReadInt32E<GarrisonResult>("Result");
-            packet.ReadByte("UnkByte");
+            packet.ReadByte("State");
 
             ReadGarrisonMission(packet, "Mission");
 
@@ -453,8 +453,8 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
         public static void HandleGarrisonGenerateRecruits(Packet packet)
         {
             packet.ReadPackedGuid128("NpcGuid");
-            packet.ReadUInt32("Unk1");
-            packet.ReadUInt32("Unk2");
+            packet.ReadUInt32("TraitID");
+            packet.ReadUInt32("AbilityID");
         }
 
         [Parser(Opcode.CMSG_GARRISON_GET_MISSION_REWARD)]
@@ -476,7 +476,7 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
         public static void HandleGarrisonRecruitFollower(Packet packet)
         {
             packet.ReadPackedGuid128("NpcGuid");
-            packet.ReadUInt32("Unk1");
+            packet.ReadUInt32("FollowerID");
         }
 
         [Parser(Opcode.CMSG_GARRISON_REQUEST_CLASS_SPEC_CATEGORY_INFO)]
@@ -498,8 +498,8 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
         public static void HandleGarrisonSetRecruitmentPreferences(Packet packet)
         {
             packet.ReadPackedGuid128("NpcGUID");
-            packet.ReadUInt32("Unk1");
-            packet.ReadUInt32("Unk2");
+            packet.ReadUInt32("AbilityID");
+            packet.ReadUInt32("TraitID");
         }
 
         [Parser(Opcode.CMSG_GARRISON_SWAP_BUILDINGS)]
@@ -542,6 +542,13 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
         {
             packet.ReadUInt32E<GarrisonSiteLevel>("GarrSiteLevelId");
             packet.ReadUInt32E<GarrisonResult>("Result");
+        }
+
+        [Parser(Opcode.SMSG_GARRISON_PLOT_PLACED)]
+        public static void HandleGarrisonPlotPlaced(Packet packet)
+        {
+            packet.ReadUInt32E<GarrisonType>("GarrTypeId");
+            V6_0_2_19033.Parsers.GarrisonHandler.ReadGarrisonPlotInfo(packet, "PlotInfo");
         }
     }
 }

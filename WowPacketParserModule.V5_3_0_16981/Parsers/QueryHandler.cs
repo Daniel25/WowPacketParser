@@ -94,11 +94,11 @@ namespace WowPacketParserModule.V5_3_0_16981.Parsers
 
             packet.AddSniffData(StoreNameType.Unit, entry.Key, "QUERY_RESPONSE");
 
-            Storage.CreatureTemplates.Add(creature, packet.TimeSpan);
+            Storage.CreatureTemplates.Add(creature.Entry.Value, creature, packet.TimeSpan);
 
             var objectName = new ObjectName
             {
-                ObjectType = ObjectType.Unit,
+                ObjectType = StoreNameType.Unit,
                 ID = entry.Key,
                 Name = creature.Name
             };
