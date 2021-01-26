@@ -381,5 +381,21 @@ namespace WowPacketParserModule.V8_0_1_27101.Parsers
                 packet.ReadByte("ConsumedCharges", i);
             }
         }
+
+        [Parser(Opcode.SMSG_RESUME_CAST)]
+        public static void HandleResumeCast(Packet packet)
+        {
+            packet.ReadPackedGuid128("CasterGUID");
+            packet.ReadInt32("SpellXSpellVisualID");
+            packet.ReadPackedGuid128("CastID");
+            packet.ReadPackedGuid128("Target");
+            packet.ReadInt32<SpellId>("SpellID");
+        }
+
+        [Parser(Opcode.SMSG_INTERRUPT_POWER_REGEN)]
+        public static void HandleInterruptPowerRegen(Packet packet)
+        {
+            packet.ReadUInt32("PowerTypeEnum");
+        }
     }
 }

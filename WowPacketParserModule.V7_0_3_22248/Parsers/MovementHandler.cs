@@ -1,4 +1,6 @@
-﻿using System.Linq;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using WowPacketParser.DBC;
 using WowPacketParser.Enums;
 using WowPacketParser.Misc;
@@ -6,6 +8,7 @@ using WowPacketParser.Parsing;
 using WowPacketParserModule.V7_0_3_22248.Enums;
 using CoreParsers = WowPacketParser.Parsing.Parsers;
 using MovementFlag = WowPacketParserModule.V6_0_2_19033.Enums.MovementFlag;
+using SplineFacingType = WowPacketParserModule.V6_0_2_19033.Enums.SplineFacingType;
 using SplineFlag = WowPacketParserModule.V7_0_3_22248.Enums.SplineFlag;
 
 namespace WowPacketParserModule.V7_0_3_22248.Parsers
@@ -105,13 +108,18 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
             packet.ReadUInt32("ParabolicCurveID", indexes);
         }
 
+        public static double GetDistance(Vector3 start, Vector3 end)
+        {
+            return Math.Sqrt(Math.Pow((start.X - end.X), 2) + Math.Pow((start.Y - end.Y), 2) + Math.Pow((start.Z - end.Z), 2));
+        }
+
         public static void ReadMovementSpline(Packet packet, Vector3 pos, params object[] indexes)
         {
             packet.ReadInt32E<SplineFlag>("Flags", indexes);
             packet.ReadByte("AnimTier", indexes);
             packet.ReadUInt32("TierTransStartTime", indexes);
             packet.ReadInt32("Elapsed", indexes);
-            packet.ReadUInt32("MoveTime", indexes);
+            var moveTime = packet.ReadUInt32("MoveTime", indexes);
             packet.ReadSingle("JumpGravity", indexes);
             packet.ReadUInt32("SpecialTime", indexes);
 
@@ -123,7 +131,7 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
 
             packet.ResetBitReader();
 
-            var type = packet.ReadBits("Face", 2, indexes);
+            var type = packet.ReadBitsE<SplineFacingType>("Face", 2, indexes);
             var pointsCount = packet.ReadBits("PointsCount", 16, indexes);
             var packedDeltasCount = packet.ReadBits("PackedDeltasCount", 16, indexes);
             var hasSplineFilter = packet.ReadBit("HasSplineFilter", indexes);
@@ -134,14 +142,14 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
 
             switch (type)
             {
-                case 1:
+                case SplineFacingType.Spot:
                     packet.ReadVector3("FaceSpot", indexes);
                     break;
-                case 2:
+                case SplineFacingType.Target:
                     packet.ReadSingle("FaceDirection", indexes);
                     packet.ReadPackedGuid128("FacingGUID", indexes);
                     break;
-                case 3:
+                case SplineFacingType.Angle:
                     packet.ReadSingle("FaceDirection", indexes);
                     break;
             }
@@ -178,6 +186,8 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
                 Z = (pos.Z + endpos.Z) * 0.5f
             };
 
+
+            List<Vector3> trueWaypoints = new List<Vector3>();
             for (var i = 0; i < packedDeltasCount; ++i)
             {
                 var vec = new Vector3
@@ -186,7 +196,25 @@ namespace WowPacketParserModule.V7_0_3_22248.Parsers
                     Y = mid.Y - waypoints[i].Y,
                     Z = mid.Z - waypoints[i].Z
                 };
+                trueWaypoints.Add(vec);
                 packet.AddValue("WayPoints", vec, indexes, i);
+            }
+
+            if (endpos.X != 0 && endpos.Y != 0 && endpos.Z != 0)
+            {
+                double distance = 0;
+                if (packedDeltasCount > 0)
+                {
+                    distance = GetDistance(pos, trueWaypoints[0]);
+                    for (var i = 1; i < packedDeltasCount; ++i)
+                        distance += GetDistance(trueWaypoints[i - 1], trueWaypoints[i]);
+                    distance += GetDistance(trueWaypoints[(int)(packedDeltasCount - 1)], endpos);
+                }
+                else
+                    distance = GetDistance(pos, endpos);
+
+                packet.WriteLine("(MovementMonsterSpline) Distance: " + distance.ToString());
+                packet.WriteLine("(MovementMonsterSpline) Speed: " + (distance / moveTime * 1000).ToString());
             }
         }
 
